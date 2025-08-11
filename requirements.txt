@@ -14,7 +14,7 @@ email-validator==2.2.0
 Faker==36.1.0
 fastapi==0.115.8
 greenlet==3.1.1
-h11>0.16.0
+h11==0.14.0
 httpcore==1.0.9
 httpx==0.28.1
 idna==3.10
@@ -47,5 +47,5 @@ tomli==2.2.1
 typing_extensions==4.12.2
 tzdata==2025.1
 urllib3==2.3.0
-uvicorn==0.32.0
+uvicorn==0.34.0
 alembic==1.13.3
