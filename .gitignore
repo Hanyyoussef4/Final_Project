@@ -1,38 +1,38 @@
-venv/
+# Python
 __pycache__/
-*.pyc
-.DS_Store
-.coverage
-.pytest_cache
-htmlcov
-.env
-
-# Virtual environment folders
-.venv/
-venv/
-
-# Python cache files
-__pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
-
-# OS files
-.DS_Store
-
-# Test/coverage reports
-.coverage
-htmlcov/
-.pytest_cache/
-
-# Playwright / E2E test reports
-playwright-report/
-test-results/
-
-# Environment variables
-.env
-
-# Node / Frontend (if applicable)
-node_modules/
+*.so
+*.egg-info/
 dist/
 build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment / secrets
+.env
+.env.*
+
+# pytest / coverage
+.pytest_cache/
+.coverage*
+htmlcov/
+
+# Playwright / test artifacts
+playwright-report/
+test-results/
+artifacts/
+
+# OS / Editors
+.DS_Store
+.vscode/
+
+# Node (if any)
+node_modules/
+
+# Logs
+*.log
