@@ -16,7 +16,7 @@ A tiny CRUD-style app to create and review math calculations (addition, etc.). T
 
 [![Docker Hub: hany25/module14](docs/screenshots/DockerHub Images.png)](https://hub.docker.com/r/hany25/module14 "Open Docker Hub repo")
 
-[![GitHub Actions: deploy workflow](docs/screenshots/GitHub Actions workflow.png)](https://github.com/Hanyyoussef4/Module14/actions/workflows/deploy.yml "Open deploy workflow")
+[![GitHub Actions: deploy workflow](docs/screenshots/GitHub Actions workflow.png)]"Open deploy workflow")
 
 
 # BREAD Calculator (FastAPI + Docker + Postgres)
