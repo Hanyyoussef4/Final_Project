@@ -1,0 +1,99 @@
+.
+├── .coverage
+├── .gitignore
+├── Dockerfile
+├── LICENSE
+├── PROJECT_TREE.txt
+├── README.md
+├
+├── alembic.ini
+├── docker-compose.yml
+├── init-db.sh
+├── pytest.ini
+├── requirements.txt
+├── .github
+│   ├── workflows
+│   │   ├── test.yml
+├── .vscode
+│   ├── settings.json
+├── alembic
+│   ├── README
+│   ├── env.py
+│   ├── script.py.mako
+│   ├── versions
+│   │   ├── 55851837f9c6_initial_schema.py
+├── app
+│   ├── __init__.py
+│   ├── database.py
+│   ├── database_init.py
+│   ├── main.py
+│   ├── auth
+│   │   ├── __init__.py
+│   │   ├── dependencies.py
+│   │   ├── jwt.py
+│   │   ├── redis.py
+│   ├── core
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   ├── models
+│   │   ├── __init__.py
+│   │   ├── calculation.py
+│   │   ├── user.py
+│   ├── operations
+│   │   ├── __init__.py
+│   ├── schemas
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── calculation.py
+│   │   ├── token.py
+│   │   ├── user.py
+├── docs
+│   ├── Screenshots and Nots.docx
+│   ├── Screenshots
+│   │   ├── Add_post_Calculation.png
+│   │   ├── Browse_Get_Calculation.png
+│   │   ├── Browse_works.png
+│   │   ├── Delete_Calculation.png
+│   │   ├── Deleted Transaction_removed.png
+│   │   ├── Edit_Put_Calculation.png
+│   │   ├── Edit_Works.png
+│   │   ├── Edit_saved.png
+│   │   ├── Loged in Succefully.png
+│   │   ├── Pytest100%.png
+│   │   ├── Read after deleted Transc..png
+│   │   ├── Read_GetCalcID.png
+│   │   ├── list of transactions _ History.png
+├── static
+│   ├── css
+│   │   ├── style.css
+│   ├── js
+│   │   ├── script.js
+├── templates
+│   ├── dashboard.html
+│   ├── edit_calculation.html
+│   ├── index.html
+│   ├── layout.html
+│   ├── login.html
+│   ├── register.html
+│   ├── view_calculation.html
+├── tests
+│   ├── __init__.py
+│   ├── conftest.py
+│   ├── e2e
+│   │   ├── __init__.py
+│   │   ├── test_e2e.bk
+│   │   ├── test_fastapi_calculator.py
+│   │   ├── test_ui_bread.py
+│   │   ├── test_ui_bread_playwright.py
+│   ├── integration
+│   │   ├── __init__.py
+│   │   ├── test_calculation.py
+│   │   ├── test_calculation_schema.py
+│   │   ├── test_database.py
+│   │   ├── test_dependencies.py
+│   │   ├── test_schema_base.py
+│   │   ├── test_user.py
+│   │   ├── test_user_auth.py
+│   ├── unit
+│   │   ├── __init__.py
+│   │   ├── test_calculator.py
