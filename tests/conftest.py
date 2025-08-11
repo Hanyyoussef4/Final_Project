@@ -1,273 +1,266 @@
+# tests/conftest.py
+from __future__ import annotations
+
+import os
 import socket
-import subprocess
 import time
-import logging
-from typing import Generator, Dict, List
+import subprocess
 from contextlib import contextmanager
+from pathlib import Path
+from typing import Generator, Optional
 
 import pytest
 import requests
 from faker import Faker
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
 from playwright.sync_api import sync_playwright, Browser, Page
+from sqlalchemy import text
+from sqlalchemy.engine import Engine, Connection
+from sqlalchemy.orm import sessionmaker, Session
 
-from app.database import Base, get_engine, get_sessionmaker
+# --- App imports --------------------------------------------------------------
+from app.database import Base, get_engine
 from app.models.user import User
-from app.core.config import settings
-from app.database_init import init_db, drop_db
 
-# ======================================================================================
-# Logging Configuration
-# ======================================================================================
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# -----------------------------------------------------------------------------
+# Paths / artifacts
+# -----------------------------------------------------------------------------
+ARTIFACT_DIR = Path("artifacts/e2e")
+ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+SERVER_LOG = ARTIFACT_DIR / "server.log"
 
-# ======================================================================================
-# Database Configuration
-# ======================================================================================
+# -----------------------------------------------------------------------------
+# DB config (match docker-compose)
+# -----------------------------------------------------------------------------
+PG_HOST = os.getenv("PGHOST", "127.0.0.1")
+PG_PORT = int(os.getenv("PGPORT", "5432"))
+PG_USER = os.getenv("PGUSER", "postgres")
+PG_PASSWORD = os.getenv("PGPASSWORD", "postgres")
+PG_DB_BASE = os.getenv("PGDATABASE") or os.getenv("POSTGRES_DB") or "module14_is601"
+
 fake = Faker()
-Faker.seed(12345)
 
-test_engine = get_engine(database_url=settings.DATABASE_URL)
-TestingSessionLocal = get_sessionmaker(engine=test_engine)
 
-# ======================================================================================
-# Helper Functions
-# ======================================================================================
-def create_fake_user() -> Dict[str, str]:
-    """Generate a dictionary of fake user data for testing."""
-    return {
-        "first_name": fake.first_name(),
-        "last_name": fake.last_name(),
-        "email": fake.unique.email(),
-        "username": fake.unique.user_name(),
-        "password": fake.password(length=12)
-    }
-
-@contextmanager
-def managed_db_session():
-    """Context manager for safe database session handling."""
-    session = TestingSessionLocal()
-    try:
-        yield session
-    except SQLAlchemyError as e:
-        logger.error(f"Database error: {str(e)}")
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-# ======================================================================================
-# Server Startup / Healthcheck
-# ======================================================================================
-def wait_for_server(url: str, timeout: int = 30) -> bool:
-    """
-    Wait for the server to be ready by repeatedly issuing GET requests until
-    we receive a 200 status code or hit the timeout.
-    """
-    start_time = time.time()
-    while (time.time() - start_time) < timeout:
+def _wait_for_port(host: str, port: int, timeout: float = 60.0) -> None:
+    deadline = time.time() + timeout
+    last_err: Optional[Exception] = None
+    while time.time() < deadline:
         try:
-            response = requests.get(url)
-            if response.status_code == 200:
-                return True
-        except requests.exceptions.ConnectionError:
-            time.sleep(1)
-    return False
+            with socket.create_connection((host, port), timeout=2.0):
+                return
+        except Exception as e:
+            last_err = e
+            time.sleep(0.5)
+    raise RuntimeError(f"Postgres not reachable on {host}:{port}: {last_err}")
 
-class ServerStartupError(Exception):
-    """Raised when the test server fails to start properly."""
-    pass
 
-# ======================================================================================
-# Database Fixtures
-# ======================================================================================
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_database(request):
-    """
-    Set up the test database before the session starts, and tear it down after tests
-    unless --preserve-db is provided.
-    """
-    logger.info("Setting up test database...")
-    try:
-        Base.metadata.drop_all(bind=test_engine)
-        Base.metadata.create_all(bind=test_engine)
-        init_db()
-        logger.info("Test database initialized.")
-    except Exception as e:
-        logger.error(f"Error setting up test database: {str(e)}")
-        raise
-
-    yield  # Tests run after this
-
-    if not request.config.getoption("--preserve-db"):
-        logger.info("Dropping test database tables...")
-        drop_db()
-
-@pytest.fixture
-def db_session() -> Generator[Session, None, None]:
-    """
-    Provide a test-scoped database session. Commits after a successful test;
-    rolls back if an exception occurs.
-    """
-    session = TestingSessionLocal()
-    try:
-        yield session
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-# ======================================================================================
-# Test Data Fixtures
-# ======================================================================================
-@pytest.fixture
-def fake_user_data() -> Dict[str, str]:
-    """Provide fake user data."""
-    return create_fake_user()
-
-@pytest.fixture
-def test_user(db_session: Session) -> User:
-    """
-    Create and return a single test user in the database.
-    """
-    user_data = create_fake_user()
-    user = User(**user_data)
-    db_session.add(user)
-    db_session.commit()
-    db_session.refresh(user)
-    logger.info(f"Created test user ID: {user.id}")
-    return user
-
-@pytest.fixture
-def seed_users(db_session: Session, request) -> List[User]:
-    """
-    Seed multiple test users in the database. By default, 5 users are created
-    unless a 'param' value is provided (e.g., via @pytest.mark.parametrize).
-    """
-    num_users = getattr(request, "param", 5)
-    users = [User(**create_fake_user()) for _ in range(num_users)]
-    db_session.add_all(users)
-    db_session.commit()
-    logger.info(f"Seeded {len(users)} users.")
-    return users
-
-# ======================================================================================
-# FastAPI Server Fixture
-# ======================================================================================
-def find_available_port() -> int:
-    """Find an available port for the test server by binding to port 0."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('', 0))
-        return s.getsockname()[1]
-
-@pytest.fixture(scope="session")
-def fastapi_server():
-    """
-    Start a FastAPI test server in a subprocess. If the chosen port (default: 8000)
-    is already in use, find another available port. Wait until the server is up
-    before yielding its base URL.
-    """
-    base_port = 8000
-    server_url = f'http://127.0.0.1:{base_port}/'
-
-    # Check if port is free; if not, pick an available port
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        if s.connect_ex(('127.0.0.1', base_port)) == 0:
-            base_port = find_available_port()
-            server_url = f'http://127.0.0.1:{base_port}/'
-
-    logger.info(f"Starting FastAPI server on port {base_port}...")
-
-    process = subprocess.Popen(
-        ['uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', str(base_port)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        cwd='.'  # ensure the working directory is set correctly
-    )
-
-    # IMPORTANT: Use the /health endpoint for the check!
-    health_url = f"{server_url}health"
-    if not wait_for_server(health_url, timeout=30):
-        stderr = process.stderr.read()
-        logger.error(f"Server failed to start. Uvicorn error: {stderr}")
-        process.terminate()
-        raise ServerStartupError(f"Failed to start test server on {health_url}")
-
-    logger.info(f"Test server running on {server_url}.")
-    yield server_url
-
-    logger.info("Stopping test server...")
-    process.terminate()
-    try:
-        process.wait(timeout=5)
-        logger.info("Test server stopped.")
-    except subprocess.TimeoutExpired:
-        process.kill()
-        logger.warning("Test server forcefully stopped.")
-
-# ======================================================================================
-# Playwright Fixtures for UI Testing
-# ======================================================================================
-@pytest.fixture(scope="session")
-def browser_context():
-    """Provide a Playwright browser context for UI tests (session-scoped)."""
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(
-            headless=True,
-            args=['--no-sandbox', '--disable-dev-shm-usage']
+def _ensure_database_url() -> None:
+    if not os.getenv("DATABASE_URL"):
+        os.environ["DATABASE_URL"] = (
+            f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB_BASE}"
         )
-        logger.info("Playwright browser launched.")
-        try:
-            yield browser
-        finally:
-            logger.info("Closing Playwright browser.")
-            browser.close()
 
-@pytest.fixture
-def page(browser_context: Browser):
-    """
-    Provide a new browser page for each test, with a standard viewport.
-    Closes the page and context after each test.
-    """
-    context = browser_context.new_context(
-        viewport={'width': 1920, 'height': 1080},
-        ignore_https_errors=True
-    )
-    page = context.new_page()
-    logger.info("New browser page created.")
+
+# -----------------------------------------------------------------------------
+# FastAPI server fixture (used by E2E tests)
+# -----------------------------------------------------------------------------
+@pytest.fixture(scope="session")
+def fastapi_server() -> str:
+    _wait_for_port(PG_HOST, PG_PORT, timeout=60)
+    _ensure_database_url()
+
+    if SERVER_LOG.exists():
+        SERVER_LOG.unlink()
+
+    with SERVER_LOG.open("w", encoding="utf-8") as log_fp:
+        proc = subprocess.Popen(
+            ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
+            stdout=log_fp,
+            stderr=subprocess.STDOUT,
+            env=os.environ.copy(),
+        )
+
+    base_url = "http://127.0.0.1:8000"
+
+    # Wait for /health
+    deadline = time.time() + 60
+    last_err: Optional[Exception] = None
+    while time.time() < deadline:
+        try:
+            r = requests.get(f"{base_url}/health", timeout=2.0)
+            if r.status_code == 200:
+                break
+        except Exception as e:
+            last_err = e
+        time.sleep(0.5)
+    else:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            proc.kill()
+        raise RuntimeError(
+            "FastAPI server failed to start. "
+            f"See {SERVER_LOG.resolve()} (last error: {last_err})"
+        )
+
     try:
-        yield page
+        yield base_url
     finally:
-        logger.info("Closing browser page and context.")
-        page.close()
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            proc.kill()
+
+
+# -----------------------------------------------------------------------------
+# Public base URL fixture for E2E tests ONLY
+# -----------------------------------------------------------------------------
+@pytest.fixture(scope="session", name="api_base_url")
+def api_base_url(fastapi_server: str) -> str:
+    return fastapi_server.rstrip("/")
+
+
+# -----------------------------------------------------------------------------
+# Playwright fixtures (UI)
+# -----------------------------------------------------------------------------
+@pytest.fixture(scope="session")
+def playwright_browser() -> Generator[Browser, None, None]:
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        yield browser
+        browser.close()
+
+
+@pytest.fixture(scope="function")
+def page(playwright_browser: Browser) -> Generator[Page, None, None]:
+    context = playwright_browser.new_context()
+    pg = context.new_page()
+    try:
+        yield pg
+    finally:
         context.close()
 
-# ======================================================================================
-# Pytest Command-Line Options
-# ======================================================================================
-def pytest_addoption(parser):
-    """
-    Add custom command line options:
-      --preserve-db : Keep test database after tests
-      --run-slow    : Run tests marked as 'slow'
-    """
-    parser.addoption("--preserve-db", action="store_true", help="Keep test database after tests")
-    parser.addoption("--run-slow", action="store_true", help="Run tests marked as slow")
 
-def pytest_collection_modifyitems(config, items):
+# -----------------------------------------------------------------------------
+# Engine / schema setup for integration tests
+# -----------------------------------------------------------------------------
+@pytest.fixture(scope="session")
+def engine() -> Engine:
+    _wait_for_port(PG_HOST, PG_PORT, timeout=60)
+    _ensure_database_url()
+    eng = get_engine()
+    try:
+        yield eng
+    finally:
+        eng.dispose()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _ensure_schema(engine: Engine) -> None:
+    Base.metadata.create_all(bind=engine)
+    # Ensure a clean slate at the start of the session
+    with engine.begin() as conn:
+        conn.execute(text("TRUNCATE TABLE users RESTART IDENTITY CASCADE;"))
+
+
+# -----------------------------------------------------------------------------
+# Per-test DB session: allow real commits/rollbacks, then clean up after the test
+# -----------------------------------------------------------------------------
+@pytest.fixture(scope="function")
+def db_session(engine: Engine) -> Generator[Session, None, None]:
     """
-    Skip tests marked as 'slow' unless --run-slow is specified.
+    Provide a normal Session. Tests can commit/rollback freely.
+    After each test, we TRUNCATE users so no data leaks to the next test.
     """
-    if not config.getoption("--run-slow"):
-        skip_slow = pytest.mark.skip(reason="use --run-slow to run")
-        for item in items:
-            if "slow" in item.keywords:
-                item.add_marker(skip_slow)
+    SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+        # Clean up rows created by the test
+        with engine.begin() as conn:
+            conn.execute(text("TRUNCATE TABLE users RESTART IDENTITY CASCADE;"))
+
+
+# -----------------------------------------------------------------------------
+# Helpers used by integration tests
+# -----------------------------------------------------------------------------
+def create_fake_user(**overrides) -> dict:
+    """
+    Return a DICT of user fields (NOT an ORM instance).
+    Many tests do:  user = User(**create_fake_user())
+    """
+    u = fake.uuid4()[:8]
+    return {
+        "first_name": overrides.get("first_name", fake.first_name()),
+        "last_name": overrides.get("last_name", fake.last_name()),
+        "email": overrides.get("email", f"{fake.user_name()}+{u}@example.com"),
+        "username": overrides.get("username", f"user_{u}"),
+        "password": overrides.get("password", "SecurePass123!"),
+    }
+
+
+def _persist_user(db: Session, **overrides) -> User:
+    """
+    Persist one user in the provided session and return the session-bound User.
+    """
+    data = create_fake_user(**overrides)
+    user = User(**data)
+    db.add(user)
+    db.flush()  # assign PKs without a full commit
+    return user
+
+
+# Session-bound fixtures expected by tests
+@pytest.fixture
+def test_user(db_session: Session) -> User:
+    return _persist_user(db_session)
+
+
+@pytest.fixture
+def seed_users(db_session: Session):
+    return [_persist_user(db_session) for _ in range(5)]
+
+
+# Auth tests expect a dict of valid registration credentials
+@pytest.fixture
+def fake_user_data(faker: Faker):
+    u = f"{faker.user_name()}_{fake.uuid4()[:6]}"
+    pw = "SecurePass123!"
+    return {
+        "first_name": faker.first_name(),
+        "last_name": faker.last_name(),
+        "username": u,
+        "email": f"{u}@example.com",
+        "password": pw,
+        "confirm_password": pw,
+    }
+
+
+# -----------------------------------------------------------------------------
+# Backward-compatible context manager some tests import directly
+# -----------------------------------------------------------------------------
+@contextmanager
+def managed_db_session() -> Generator[Session, None, None]:
+    """
+    Context manager that yields a Session for ad-hoc DB work inside a test.
+    Changes are visible during the 'with' block, then cleaned after.
+    """
+    _wait_for_port(PG_HOST, PG_PORT, timeout=60)
+    _ensure_database_url()
+
+    eng = get_engine()
+    try:
+        Base.metadata.create_all(bind=eng)
+        SessionLocal = sessionmaker(bind=eng, autocommit=False, autoflush=False)
+        s = SessionLocal()
+        try:
+            yield s
+        finally:
+            s.close()
+            with eng.begin() as conn:
+                conn.execute(text("TRUNCATE TABLE users RESTART IDENTITY CASCADE;"))
+    finally:
+        eng.dispose()
