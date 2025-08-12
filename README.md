@@ -3,20 +3,13 @@
 
 # Calculations App (FastAPI + PostgreSQL + Playwright)
 
-> CI status: ![CI](https://github.com/<YOUR_USER>/<YOUR_REPO>/actions/workflows/test.yml/badge.svg)
+> CI status: ![CI](https://github.com/Hanyyoussef4/Module14/actions/workflows/test.yml/badge.svg)
 
 A small web app that demonstrates **BREAD** (Browse, Read, Edit, Add, Delete) with a calculator history, backed by PostgreSQL and exposed via both **HTML pages** and **JSON APIs**. Includes **token-based auth** (register/login/me), **pytest** unit/API tests, and **Playwright** end-to-end tests. CI runs in **GitHub Actions**.
 
 A tiny CRUD-style app to create and review math calculations (addition, etc.). The stack includes **FastAPI**, **SQLAlchemy**, **PostgreSQL**, **Docker Compose**, and **Playwright** for end‑to‑end UI tests.
 
 > ✅ Status: all unit/integration/E2E tests pass .
-
-
-## Deploy Proof
-
-[![Docker Hub: hany25/module14](docs/screenshots/DockerHub Images.png)](https://hub.docker.com/r/hany25/module14 "Open Docker Hub repo")
-
-[![GitHub Actions: deploy workflow](docs/screenshots/GitHub Actions workflow.png)]"Open deploy workflow")
 
 
 # BREAD Calculator (FastAPI + Docker + Postgres)
