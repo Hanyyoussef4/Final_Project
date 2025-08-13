@@ -8,6 +8,13 @@ For this final project, we extended the existing calculator application by:
 * **Implementing a JWT-secured `/reports/summary` endpoint** – Only authenticated users can access calculation history summaries via Swagger UI or API calls.
 * **Enhancing the dashboard UI** – Added real-time calculation statistics display, integrating the backend data with the frontend view.
 
+## 📊 New Feature – Stats UI Integration
+
+Below is a preview of the enhanced dashboard UI with the new real-time stats section:
+
+![Stats UI Integration](docs/Screenshots/1-stats%20UI%20Integration.png)
+
+
 These changes improved both the **security** and **usability** of the application.
 
 ---
