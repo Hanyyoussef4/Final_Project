@@ -39,7 +39,7 @@ from app.schemas.calculation import CalculationBase, CalculationResponse, Calcul
 from app.schemas.token import TokenResponse  # API token schema
 from app.schemas.user import UserCreate, UserResponse, UserLogin  # User schemas
 from app.database import Base, get_db, engine  # Database connection
-
+from app.api.routers import reports  # reports API router
 
 # ------------------------------------------------------------------------------
 # Create tables on startup using the lifespan event
@@ -79,6 +79,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Set up Jinja2 templates directory for HTML rendering
 templates = Jinja2Templates(directory="templates")
 
+# ------------------------------------------------------------------------------
+# Include API Routers
+# ------------------------------------------------------------------------------
+app.include_router(reports.router)  # /reports/summary
 
 # ------------------------------------------------------------------------------
 # Web (HTML) Routes
@@ -116,14 +120,8 @@ def register_page(request: Request):
 @app.get("/dashboard", response_class=HTMLResponse, tags=["web"])
 def dashboard_page(request: Request):
     """
-    Dashboard page, listing calculations & new calculation form.
-    
-    This is the main interface after login, where users can:
-    - See all their calculations
-    - Create a new calculation
-    - Access links to view/edit/delete calculations
-    
-    JavaScript in this page calls the API endpoints to fetch and display data.
+    Dashboard page shell (no server-side auth). The client fetches data from
+    the API using the JWT stored in localStorage and populates the UI.
     """
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
