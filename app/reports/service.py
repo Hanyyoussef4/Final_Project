@@ -3,11 +3,24 @@ from sqlalchemy import func
 from app.models.calculation import Calculation
 from app.schemas.report import ReportSummary, RecentCalculation
 
+
 def build_report_summary(db: Session, user_id: str) -> ReportSummary:
+    """
+    Build a summary report of calculations for a given user.
+
+    Args:
+        db (Session): SQLAlchemy session
+        user_id (str): User's ID
+
+    Returns:
+        ReportSummary: Summary of calculation statistics
+    """
+    # Total count of all calculations
     total_count = db.query(func.count(Calculation.id)).filter(
         Calculation.user_id == user_id
     ).scalar()
 
+    # Count by operation type
     counts_by_operation = dict(
         db.query(
             Calculation.type,
@@ -18,19 +31,23 @@ def build_report_summary(db: Session, user_id: str) -> ReportSummary:
         .all()
     )
 
-    # Fetch in Python and compute average operands
-    all_inputs = db.query(Calculation.inputs).filter(
-        Calculation.user_id == user_id
-    ).all()
-    operand_counts = [len(inputs or []) for (inputs,) in all_inputs]
-    avg_operands = sum(operand_counts) / len(operand_counts) if operand_counts else 0
+    # Average number of inputs
+    avg_inputs = db.query(
+        func.avg(func.cardinality(Calculation.inputs))
+    ).filter(Calculation.user_id == user_id).scalar() or 0
 
-    recent_calcs = db.query(Calculation).filter(
-        Calculation.user_id == user_id
-    ).order_by(Calculation.created_at.desc()).limit(5).all()
+    # Most recent 5 calculations
+    recent_calcs = (
+        db.query(Calculation)
+        .filter(Calculation.user_id == user_id)
+        .order_by(Calculation.created_at.desc())
+        .limit(5)
+        .all()
+    )
 
     recent_calcs_schema = [
         RecentCalculation(
+            id=calc.id,  # 
             type=calc.type,
             inputs=calc.inputs,
             result=calc.result,
@@ -42,6 +59,6 @@ def build_report_summary(db: Session, user_id: str) -> ReportSummary:
     return ReportSummary(
         total_calculations=total_count,
         counts_by_operation=counts_by_operation,
-        average_operands=avg_operands,
+        average_inputs=avg_inputs,
         recent_calculations=recent_calcs_schema
     )
