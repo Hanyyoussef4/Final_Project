@@ -47,7 +47,7 @@ jobs:
           source venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
-          playwright install  # if you use Playwright for e2e tests
+          playwright install
 
       - name: Wait for Postgres
         run: |
@@ -57,18 +57,22 @@ jobs:
             sleep 3
           done
 
+      - name: Create .env for migrations
+        run: |
+          cat <<EOF > .env
+          DATABASE_URL=postgresql://postgres:postgres@postgres:5432/fastapi_test_db
+          TEST_DATABASE_URL=postgresql://postgres:postgres@postgres:5432/fastapi_test_db
+          JWT_SECRET_KEY=ci-secret-key-min-32-chars
+          JWT_REFRESH_SECRET_KEY=ci-refresh-secret-key-min-32-chars
+          ALGORITHM=HS256
+          ACCESS_TOKEN_EXPIRE_MINUTES=30
+          REFRESH_TOKEN_EXPIRE_DAYS=7
+          BCRYPT_ROUNDS=12
+          CORS_ORIGINS=["*"]
+          REDIS_URL=redis://localhost:6379/0
+          EOF
+
       - name: Run migrations
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@postgres:5432/fastapi_test_db
-          TEST_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/fastapi_test_db
-          JWT_SECRET_KEY: "ci-secret-key-min-32-chars"
-          JWT_REFRESH_SECRET_KEY: "ci-refresh-secret-key-min-32-chars"
-          ALGORITHM: "HS256"
-          ACCESS_TOKEN_EXPIRE_MINUTES: 30
-          REFRESH_TOKEN_EXPIRE_DAYS: 7
-          BCRYPT_ROUNDS: 12
-          CORS_ORIGINS: '["*"]'
-          REDIS_URL: "redis://localhost:6379/0"
         run: |
           source venv/bin/activate
           alembic upgrade head
@@ -79,9 +83,7 @@ jobs:
           TEST_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/fastapi_test_db
         run: |
           source venv/bin/activate
-          pytest tests/unit/ --cov=src --junitxml=test-results/junit.xml
-          pytest tests/integration/
-          pytest tests/e2e/
+          pytest --maxfail=1 --disable-warnings -q
 
   security:
     needs: test
