@@ -49,12 +49,15 @@ jobs:
           pip install -r requirements.txt
           playwright install
 
-      - name: Wait for Postgres
+      - name: Wait for Postgres (full connection test)
         run: |
-          for i in {1..10}; do
-            nc -z db 5432 && echo "Postgres is up!" && break
+          for i in {1..30}; do
+            if PGPASSWORD=postgres psql -h db -U postgres -d fastapi_test_db -c '\q' 2>/dev/null; then
+              echo "Postgres is ready!"
+              break
+            fi
             echo "Waiting for Postgres..."
-            sleep 3
+            sleep 2
           done
 
       - name: Create .env for tests
