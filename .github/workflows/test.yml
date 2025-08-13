@@ -1,4 +1,4 @@
-name: test
+name: CI/CD
 
 on:
   push:
@@ -25,53 +25,77 @@ jobs:
           --health-retries=5
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install dependencies
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@postgres:5432/fastapi_test_db
+          TEST_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/fastapi_test_db
         run: |
-          python -m venv .venv
-          source .venv/bin/activate
+          python -m venv venv
+          source venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
-
-      # Install Playwright browsers so UI tests don't fail
-      - name: Install Playwright browsers
-        run: |
-          source .venv/bin/activate
-          playwright install --with-deps
-
-      # Create schema directly from models (skip migrations)
-      - name: Create schema from models
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fastapi_test_db
-        run: |
-          source .venv/bin/activate
-          python -c "from app.database import Base, engine; Base.metadata.create_all(bind=engine)"
+          playwright install
 
       - name: Run tests
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fastapi_test_db
+          DATABASE_URL: postgresql://postgres:postgres@postgres:5432/fastapi_test_db
+          TEST_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/fastapi_test_db
         run: |
-          source .venv/bin/activate
-          pytest --maxfail=1 --disable-warnings -q --cov=app --cov-report=term-missing
+          source venv/bin/activate
+          pytest --maxfail=1 --disable-warnings -q
 
   security:
-    runs-on: ubuntu-latest
     needs: test
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Run security checks
-        run: echo "Security checks go here"
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t app:test .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'app:test'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
 
   deploy:
-    runs-on: ubuntu-latest
     needs: security
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
     steps:
-      - uses: actions/checkout@v3
-      - name: Deploy to GitHub Pages
-        run: echo "Deployment steps go here"
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: |
+            hany25/final_project:latest
+            hany25/final_project:${{ github.sha }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=registry,ref=hany25/final_project:cache
+          cache-to: type=inline,mode=max
