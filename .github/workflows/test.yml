@@ -1,58 +1,106 @@
-name: test
+name: CI/CD
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: mytestdb  # <-- Dedicated test DB name
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      
+      - uses: actions/setup-python@v4
         with:
-          python-version: 3.11
-
+          python-version: '3.10'
+          
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
       - name: Install dependencies
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/mytestdb
         run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov playwright
-          playwright install --with-deps
-
-      - name: Wait for Postgres
-        run: sleep 10
-
-      - name: Run Alembic migrations on test DB
-        run: alembic upgrade head
-
+          playwright install  # if you use Playwright for e2e tests
+      
       - name: Run tests
-        run: pytest --maxfail=1 --disable-warnings -q
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/mytestdb
+        run: |
+          source venv/bin/activate
+          
+          # 1) Unit tests
+          pytest tests/unit/ --cov=src --junitxml=test-results/junit.xml
+          
+          # 2) Integration tests
+          pytest tests/integration/
+          
+          # 3) E2E or other tests
+          pytest tests/e2e/
 
   security:
-    runs-on: ubuntu-latest
     needs: test
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Run security checks
-        run: |
-          pip install bandit
-          bandit -r app
-
-  deploy:
     runs-on: ubuntu-latest
-    needs: security
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Deploy to Docker Hub
-        run: |
-          echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-          docker build -t $DOCKER_USERNAME/final_project:latest .
-          docker push $DOCKER_USERNAME/final_project:latest
+      - uses: actions/checkout@v4
+      
+      - name: Build image
+        run: docker build -t app:test .
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'app:test'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+  
+  deploy:
+    needs: security
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: docker/setup-buildx-action@v3
+      
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+      - uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: |
+            hany25/final_project:latest
+            hany25/final_project:${{ github.sha }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=registry,ref=hany25/final_project:cache
+          cache-to: type=inline,mode=max
