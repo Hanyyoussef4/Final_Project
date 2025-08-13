@@ -36,3 +36,4 @@ node_modules/
 
 # Logs
 *.log
+dev.db
