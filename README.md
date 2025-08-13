@@ -29,6 +29,7 @@ These changes improved both the **security** and **usability** of the applicatio
 
 ---
 
+
 ## Calculations App – JWT-Secured CRUD + Reporting
 
 A FastAPI + PostgreSQL application where authenticated users perform math calculations (add, subtract, multiply, divide), manage their history (BREAD/CRUD), and view personal stats via a JWT-secured **/reports/summary** endpoint. A lightweight HTML dashboard (Jinja + Tailwind) provides a polished UI. Swagger UI documents and exercises the API with OAuth2 Password Flow (Bearer tokens).
