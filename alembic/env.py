@@ -10,17 +10,19 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from dotenv import load_dotenv
 
-# --- Force load .env from same folder as alembic.ini ---
+# --- Try to load DATABASE_URL from environment first ---
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# --- If not found, load .env from project root ---
 BASE_DIR = pathlib.Path(__file__).resolve().parents[1]
 env_path = BASE_DIR / ".env"
-if not env_path.exists():
-    raise FileNotFoundError(f".env file not found at {env_path}")
-load_dotenv(env_path)
+if not DATABASE_URL and env_path.exists():
+    load_dotenv(env_path)
+    DATABASE_URL = os.getenv("DATABASE_URL")
 
 # --- Validate DATABASE_URL ---
-DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    raise EnvironmentError("DATABASE_URL is missing from .env file")
+    raise EnvironmentError("DATABASE_URL is missing. Set it in env vars or .env file.")
 
 # --- Import models ---
 from app.database import Base
