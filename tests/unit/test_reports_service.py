@@ -44,12 +44,13 @@ def sample_calculations(db_session: Session, test_user):
 def test_build_report_summary_counts_and_average(db_session: Session, test_user, sample_calculations):
     summary = build_report_summary(db_session, test_user.id)
 
-    assert summary.total_calculations == 3
-    assert summary.counts_by_operation == {"addition": 2, "subtraction": 1}
+    # Adjusted for dict return
+    assert summary["total_calculations"] == 3
+    assert summary["counts_by_operation"] == {"addition": 2, "subtraction": 1}
     # Average operands: (3 + 2 + 2) / 3 = 2.33
-    assert round(summary.average_operands, 2) == 2.33
-    assert len(summary.recent_calculations) == 3
+    assert round(summary["average_operands"], 2) == 2.33
+    assert len(summary["recent_calculations"]) == 3
 
     # Most recent should be the 'addition' with inputs [4, 4]
-    assert summary.recent_calculations[0].type == "addition"
-    assert summary.recent_calculations[0].inputs == [4, 4]
+    assert summary["recent_calculations"][0].type == "addition"
+    assert summary["recent_calculations"][0].inputs == [4, 4]
