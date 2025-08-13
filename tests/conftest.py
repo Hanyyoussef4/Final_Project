@@ -31,7 +31,7 @@ SERVER_LOG = ARTIFACT_DIR / "server.log"
 # -----------------------------------------------------------------------------
 # DB config (match docker-compose)
 # -----------------------------------------------------------------------------
-PG_HOST = os.getenv("PGHOST", "127.0.0.1")
+PG_HOST = os.getenv("PGHOST", "db" if os.getenv("DOCKER_ENV") else "127.0.0.1")
 PG_PORT = int(os.getenv("PGPORT", "5432"))
 PG_USER = os.getenv("PGUSER", "postgres")
 PG_PASSWORD = os.getenv("PGPASSWORD", "postgres")

@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      DOCKER_ENV: "1"  # Ensures PG_HOST resolves to "db" inside Docker/CI
     services:
       postgres:
         image: postgres:latest
