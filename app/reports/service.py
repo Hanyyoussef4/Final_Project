@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.calculation import Calculation
-from app.schemas.report import ReportSummary, RecentCalculation  # make sure these imports exist
+from app.schemas.report import ReportSummary, RecentCalculation
 
 def build_report_summary(db: Session, user_id: str) -> ReportSummary:
     total_count = db.query(func.count(Calculation.id)).filter(
@@ -18,9 +18,12 @@ def build_report_summary(db: Session, user_id: str) -> ReportSummary:
         .all()
     )
 
-    avg_operands = db.query(
-        func.avg(func.array_length(Calculation.inputs, 1))
-    ).filter(Calculation.user_id == user_id).scalar() or 0
+    # Fetch in Python and compute average operands
+    all_inputs = db.query(Calculation.inputs).filter(
+        Calculation.user_id == user_id
+    ).all()
+    operand_counts = [len(inputs or []) for (inputs,) in all_inputs]
+    avg_operands = sum(operand_counts) / len(operand_counts) if operand_counts else 0
 
     recent_calcs = db.query(Calculation).filter(
         Calculation.user_id == user_id
