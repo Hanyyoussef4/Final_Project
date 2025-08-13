@@ -72,6 +72,17 @@ jobs:
           REDIS_URL=redis://localhost:6379/0
           EOF
 
+      - name: Wait for Postgres (before migrations)
+        run: |
+          for i in {1..20}; do
+            if PGPASSWORD=postgres psql -h db -U postgres -d fastapi_test_db -c '\q' 2>/dev/null; then
+              echo "Postgres is ready!"
+              break
+            fi
+            echo "Waiting for Postgres..."
+            sleep 3
+          done
+
       - name: Run migrations
         env:
           DATABASE_URL: postgresql://postgres:postgres@db:5432/fastapi_test_db
