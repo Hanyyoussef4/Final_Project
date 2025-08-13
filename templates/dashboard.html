@@ -1,3 +1,4 @@
+
 {% extends "layout.html" %}
 {% block title %}Dashboard{% endblock %}
 
@@ -86,6 +87,55 @@
       </button>
     </div>
   </form>
+</div>
+
+<!-- My Stats (Client-rendered with JS) -->
+<div 
+  class="bg-white shadow-lg rounded-lg mb-6 p-6 
+         transition-all duration-300 hover:shadow-xl border border-gray-100"
+>
+  <h2 class="text-xl font-bold mb-4 text-gray-800 flex items-center">
+    <svg class="w-5 h-5 mr-2 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h18M9 7h6M5 11h14M7 15h10M9 19h6"></path>
+    </svg>
+    My Stats
+  </h2>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+    <div>
+      <div class="text-sm text-gray-600">Total Calculations</div>
+      <div class="text-2xl font-bold text-gray-900" data-report-total>0</div>
+    </div>
+    <div>
+      <div class="text-sm text-gray-600">Average Operands</div>
+      <div class="text-2xl font-bold text-gray-900" data-report-average>0.00</div>
+    </div>
+    <div>
+      <div class="text-sm text-gray-600">Counts by Operation</div>
+      <ul class="mt-1 list-disc list-inside text-gray-800" data-report-ops>
+        <li>Loading…</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mt-5">
+    <div class="text-sm text-gray-600">Recent Calculations</div>
+    <div class="overflow-x-auto rounded-lg border border-gray-200 mt-2">
+      <table class="min-w-full table-auto">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">When</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Operation</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Numbers</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Result</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200" data-report-recent>
+          <tr><td colspan="4" class="px-6 py-6 text-center text-gray-500">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- Calculations History Card -->
@@ -192,7 +242,6 @@ document.addEventListener('DOMContentLoaded', function() {
     errorMessage.textContent = msg;
     errorAlert.classList.remove('hidden');
     
-    // Auto hide after 5 seconds
     setTimeout(() => {
       errorAlert.classList.add('opacity-0');
       setTimeout(() => {
@@ -201,7 +250,6 @@ document.addEventListener('DOMContentLoaded', function() {
       }, 300);
     }, 5000);
     
-    // Scroll to the error message if not visible
     errorAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
   
@@ -211,7 +259,6 @@ document.addEventListener('DOMContentLoaded', function() {
     successMessage.textContent = msg;
     successAlert.classList.remove('hidden');
     
-    // Auto hide after 5 seconds
     setTimeout(() => {
       successAlert.classList.add('opacity-0');
       setTimeout(() => {
@@ -220,7 +267,6 @@ document.addEventListener('DOMContentLoaded', function() {
       }, 300);
     }, 5000);
     
-    // Scroll to the success message if not visible
     successAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
@@ -228,7 +274,6 @@ document.addEventListener('DOMContentLoaded', function() {
   async function loadCalculations() {
     try {
       const tableBody = document.getElementById('calculationsTable');
-      // Show loading indicator
       document.getElementById('loadingRow')?.classList.remove('hidden');
       
       const response = await fetch('/calculations', {
@@ -268,7 +313,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const row = document.createElement('tr');
         row.classList.add('hover:bg-gray-50', 'transition-colors');
         
-        // Format the date nicely
         const calcDate = new Date(calc.created_at);
         const dateOptions = { year: 'numeric', month: 'short', day: 'numeric' };
         const formattedDate = calcDate.toLocaleDateString(undefined, dateOptions);
@@ -333,7 +377,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
           const calcId = e.target.closest('.delete-calc').dataset.id;
           
-          // Show loading spinner in the button
           const originalContent = e.target.closest('.delete-calc').innerHTML;
           e.target.closest('.delete-calc').innerHTML = '<svg class="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Deleting...';
           e.target.closest('.delete-calc').disabled = true;
@@ -354,7 +397,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             showSuccess('Calculation deleted successfully');
-            // Fade out the row before removing it
             const row = e.target.closest('tr');
             row.style.transition = 'opacity 0.5s';
             row.style.opacity = '0';
@@ -363,10 +405,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 500);
             
           } catch (err) {
-            // Restore the button
             e.target.closest('.delete-calc').innerHTML = originalContent;
             e.target.closest('.delete-calc').disabled = false;
-            
             showError(err.message || 'Error deleting calculation');
           }
         });
@@ -374,7 +414,6 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (err) {
       showError(err.message || 'Error loading calculations');
       
-      // Show error state in the table
       const tableBody = document.getElementById('calculationsTable');
       tableBody.innerHTML = `
         <tr>
@@ -392,109 +431,142 @@ document.addEventListener('DOMContentLoaded', function() {
         </tr>
       `;
       
-      // Add retry button functionality
       document.getElementById('retryButton')?.addEventListener('click', loadCalculations);
     }
   }
 
-  // Handle form submission for new calculation
-  document.getElementById('calculationForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const form = e.target;
-    const submitButton = form.querySelector('button[type="submit"]');
-    const originalButtonContent = submitButton.innerHTML;
-    
-    const inputsVal = document.getElementById('calcInputs').value;
-    const inputs = inputsVal.split(',')
-      .map(num => parseFloat(num.trim()))
-      .filter(num => !isNaN(num));
-
-    if (inputs.length < 2) {
-      showError('Please enter at least two valid numbers, separated by commas');
-      
-      // Highlight the input field with an error state
-      const inputField = document.getElementById('calcInputs');
-      inputField.classList.add('border-red-500');
-      inputField.focus();
-      
-      // Remove error highlight after 3 seconds or when user types
-      setTimeout(() => inputField.classList.remove('border-red-500'), 3000);
-      inputField.addEventListener('input', () => inputField.classList.remove('border-red-500'), { once: true });
-      
-      return;
-    }
-
-    const newCalc = {
-      type: document.getElementById('calcType').value,
-      inputs
-    };
-
-    // Show loading state in the button
-    submitButton.disabled = true;
-    submitButton.innerHTML = '<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Calculating...';
-
+  // New: load report summary for the "My Stats" card
+  async function loadReportSummary() {
     try {
-      const response = await fetch('/calculations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(newCalc)
+      const resp = await fetch('/reports/summary', {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      
-      if (!response.ok) {
-        if (response.status === 401) {
+      if (!resp.ok) {
+        if (resp.status === 401) {
           localStorage.clear();
           window.location.href = '/login';
           return;
         }
-        
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to create calculation');
+        throw new Error('Failed to load report summary');
       }
-      
-      // Get the created calculation data
-      const result = await response.json();
-      
-      showSuccess(`Calculation complete: ${result.result}`);
-      form.reset();
-      loadCalculations();
-      
-      // Add a highlight effect to the table to draw attention to the new entry
-      setTimeout(() => {
-        const tableBody = document.getElementById('calculationsTable');
-        if (tableBody.firstChild) {
-          tableBody.firstChild.classList.add('bg-blue-50');
-          setTimeout(() => {
-            tableBody.firstChild.classList.remove('bg-blue-50');
-          }, 2000);
+      const data = await resp.json();
+
+      const totalEl = document.querySelector('[data-report-total]');
+      const avgEl   = document.querySelector('[data-report-average]');
+      const opsEl   = document.querySelector('[data-report-ops]');
+      const recentTbody = document.querySelector('[data-report-recent]');
+
+      if (totalEl) totalEl.textContent = data.total_calculations ?? 0;
+      if (avgEl)   avgEl.textContent   = Number(data.average_operands ?? 0).toFixed(2);
+
+      if (opsEl) {
+        opsEl.innerHTML = '';
+        const entries = Object.entries(data.counts_by_operation || {});
+        if (entries.length === 0) {
+          opsEl.innerHTML = '<li>No data yet</li>';
+        } else {
+          entries.forEach(([op, cnt]) => {
+            const li = document.createElement('li');
+            li.innerHTML = `<strong class="capitalize">${op}</strong>: ${cnt}`;
+            opsEl.appendChild(li);
+          });
         }
-      }, 500);
-      
-    } catch (error) {
-      showError(error.message || 'Error creating calculation');
-    } finally {
-      // Restore button state
-      submitButton.disabled = false;
-      submitButton.innerHTML = originalButtonContent;
+      }
+
+      if (recentTbody) {
+        recentTbody.innerHTML = '';
+        const recent = data.recent_calculations || [];
+        if (recent.length === 0) {
+          recentTbody.innerHTML =
+            '<tr><td colspan="4" class="px-6 py-6 text-center text-gray-500">No recent calculations.</td></tr>';
+        } else {
+          recent.forEach(c => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50 transition-colors';
+            tr.innerHTML = `
+              <td class="px-6 py-4 whitespace-nowrap text-gray-800">${c.created_at}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-gray-800 capitalize">${c.type}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-gray-800">${(c.inputs || []).join(', ')}</td>
+              <td class="px-6 py-4 whitespace-nowrap font-semibold text-gray-800">${c.result}</td>
+            `;
+            recentTbody.appendChild(tr);
+          });
+        }
+      }
+    } catch (err) {
+      console.error(err);
     }
-  });
+  }
 
   // Initial load
   loadCalculations();
-  
-  // Optional features:
-  
-  // 1. Auto-refresh every 30 seconds
-  // const refreshInterval = setInterval(loadCalculations, 30000);
-  
-  // 2. Add clear form button
+  loadReportSummary();
+
+  // Optional: auto-refresh every 30s
+  // setInterval(() => { loadCalculations(); loadReportSummary(); }, 30000);
+
+  // === NEW: create-calculation handler (POST /calculations) ===
+  const calcForm   = document.getElementById('calculationForm');
+  const calcType   = document.getElementById('calcType');
   const calcInputs = document.getElementById('calcInputs');
+
+  function parseInputsToNumbers(raw) {
+    return (raw || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(n => Number(n));
+  }
+
+  async function createCalculation(type, inputs) {
+    const resp = await fetch('/calculations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ type, inputs })
+    });
+    if (!resp.ok) {
+      if (resp.status === 401) {
+        localStorage.clear();
+        window.location.href = '/login';
+        return null;
+      }
+      const text = await resp.text().catch(() => '');
+      throw new Error(text || 'Failed to create calculation');
+    }
+    return resp.json();
+  }
+
+  if (calcForm) {
+    calcForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const type = (calcType?.value || 'addition').toLowerCase();
+      const inputs = parseInputsToNumbers(calcInputs?.value);
+
+      if (!inputs.length || inputs.some(Number.isNaN)) {
+        showError('Please enter a comma-separated list of numbers, e.g. 5, 10, 15');
+        return;
+      }
+
+      try {
+        await createCalculation(type, inputs);
+        showSuccess('Calculation added successfully');
+        // clear inputs
+        calcForm.reset();
+        // refresh data
+        await Promise.all([loadCalculations(), loadReportSummary()]);
+      } catch (err) {
+        showError(err.message || 'Failed to create calculation');
+      }
+    });
+  }
+
+  // 2. Add clear form button
   calcInputs.addEventListener('input', function() {
     if (this.value.trim() !== '') {
-      // Show clear button when there's input
       if (!this.nextElementSibling || !this.nextElementSibling.classList.contains('clear-button')) {
         const clearButton = document.createElement('button');
         clearButton.type = 'button';
@@ -505,13 +577,10 @@ document.addEventListener('DOMContentLoaded', function() {
           this.focus();
           clearButton.remove();
         });
-        
-        // Make sure the input's parent is position relative
         this.parentElement.style.position = 'relative';
         this.parentElement.appendChild(clearButton);
       }
     } else if (this.nextElementSibling && this.nextElementSibling.classList.contains('clear-button')) {
-      // Remove clear button when input is empty
       this.nextElementSibling.remove();
     }
   });
