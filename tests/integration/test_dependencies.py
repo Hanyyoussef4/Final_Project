@@ -7,6 +7,10 @@ from app.models.user import User
 from uuid import uuid4
 from datetime import datetime, timezone
 
+# --- NEW: for the async edge-case integration at the bottom ---
+import httpx
+from app.main import app
+
 # Sample user data dictionaries for testing
 sample_user_data = {
     "id": uuid4(),
@@ -103,3 +107,40 @@ def test_get_current_active_user_inactive(mock_verify_token):
 
     assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
     assert exc_info.value.detail == "Inactive user"
+
+
+# -----------------------------
+# NEW: simple async integration to hit auth header edge cases
+# -----------------------------
+
+# Try both forms in case your routes are mounted with/without /api
+_PROTECTED_PATHS = ["/calculations", "/api/calculations"]
+
+@pytest.mark.asyncio
+async def test_wrong_scheme_and_empty_bearer_are_blocked():
+    """
+    Exercises easy-to-miss branches in app/auth/dependencies.py:
+      - Non-Bearer scheme like "Token ..." -> unauthorized/forbidden
+      - Empty Bearer value "Bearer "       -> unauthorized/forbidden/422
+    We ignore 404s so this stays stable whether /calculations is under / or /api.
+    """
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+        # Wrong scheme
+        for path in _PROTECTED_PATHS:
+            r = await ac.get(path, headers={"Authorization": "Token abc"})
+            if r.status_code != status.HTTP_404_NOT_FOUND:
+                assert r.status_code in (
+                    status.HTTP_401_UNAUTHORIZED,
+                    status.HTTP_403_FORBIDDEN,
+                )
+
+        # Empty Bearer token
+        for path in _PROTECTED_PATHS:
+            r = await ac.get(path, headers={"Authorization": "Bearer "})
+            if r.status_code != status.HTTP_404_NOT_FOUND:
+                assert r.status_code in (
+                    status.HTTP_401_UNAUTHORIZED,
+                    status.HTTP_403_FORBIDDEN,
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )

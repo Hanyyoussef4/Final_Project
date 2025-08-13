@@ -54,10 +54,17 @@ def _wait_for_port(host: str, port: int, timeout: float = 60.0) -> None:
 
 
 def _ensure_database_url() -> None:
+    """
+    Ensure DATABASE_URL is set for tests, preferring TEST_DATABASE_URL if available.
+    """
     if not os.getenv("DATABASE_URL"):
-        os.environ["DATABASE_URL"] = (
-            f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB_BASE}"
-        )
+        test_db_url = os.getenv("TEST_DATABASE_URL")
+        if test_db_url:
+            os.environ["DATABASE_URL"] = test_db_url
+        else:
+            os.environ["DATABASE_URL"] = (
+                f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB_BASE}"
+            )
 
 
 # -----------------------------------------------------------------------------
